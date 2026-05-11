@@ -8,16 +8,23 @@ use std::sync::Arc;
 use tokio::sync::{watch, mpsc};
 use crate::engine::{GenerationEngine, PromptRequest, ClientMessage, ServerMessage};
 use crate::state::AppState;
+use crate::config::AppConfig;
 
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     Extension(engine): Extension<Arc<dyn GenerationEngine>>,
     Extension(state): Extension<Arc<AppState>>,
+    Extension(config): Extension<Arc<AppConfig>>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_socket(socket, engine, state))
+    ws.on_upgrade(move |socket| handle_socket(socket, engine, state, config))
 }
 
-async fn handle_socket(socket: WebSocket, engine: Arc<dyn GenerationEngine>, state: Arc<AppState>) {
+async fn handle_socket(
+    socket: WebSocket, 
+    engine: Arc<dyn GenerationEngine>, 
+    state: Arc<AppState>,
+    config: Arc<AppConfig>,
+) {
     let (mut sender, mut receiver) = socket.split();
     
     let (tx_goal, mut rx_goal) = watch::channel::<Option<PromptRequest>>(None);
@@ -29,7 +36,6 @@ async fn handle_socket(socket: WebSocket, engine: Arc<dyn GenerationEngine>, sta
     let tx_res_worker = tx_res.clone();
     
     let worker_handle = tokio::spawn(async move {
-
         while rx_goal.changed().await.is_ok() {
             let req_opt = rx_goal.borrow().clone();
             if let Some(req) = req_opt {
@@ -82,9 +88,13 @@ async fn handle_socket(socket: WebSocket, engine: Arc<dyn GenerationEngine>, sta
                                     }
                                 }
                             }
-                            Err(e) => {
-                                tracing::warn!("Invalid message format: {}", e);
-                                let _ = tx_res.send(ServerMessage::Error("Invalid message format".to_string())).await;
+                            Err(_) => {
+                                // Use defaults from config for fallback
+                                let _ = tx_goal.send(Some(PromptRequest { 
+                                    prompt: text, 
+                                    seed: config.defaults.seed, 
+                                    steps: config.defaults.steps 
+                                }));
                             }
                         }
                     }

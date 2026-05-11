@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  nebula-canvas:
+    build:
+      context: ..
+      dockerfile: nebula-canvas/Dockerfile
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_WS_URL=ws://localhost:3001/ws
+      - NEBULA_DATABASE__PATH=/app/data/nebula_canvas.redb
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

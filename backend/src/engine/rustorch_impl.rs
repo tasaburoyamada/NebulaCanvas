@@ -2,31 +2,49 @@ use super::{GenerationEngine, ImageResponse, PromptRequest};
 use async_trait::async_trait;
 use rustorch::{Tensor, Device, DType};
 use image::{Rgb, RgbImage};
+use crate::config::AppConfig;
 
-pub struct RusTorchEngine;
+pub struct RusTorchEngine {
+    device: Device,
+}
+
+impl RusTorchEngine {
+    pub fn new(config: &AppConfig) -> Self {
+        let device = if config.engine.device == "cpu" {
+            Device::Cpu
+        } else if config.engine.device.starts_with("accelerated:") {
+            let id = config.engine.device.split(':').nth(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+            Device::Accelerated(id)
+        } else {
+            Device::Cpu
+        };
+
+        Self { device }
+    }
+}
 
 #[async_trait]
 impl GenerationEngine for RusTorchEngine {
     async fn generate(&self, req: PromptRequest) -> anyhow::Result<ImageResponse> {
-        // Deterministic ID generation using Blake3 (moved here for engine integrity)
+        // Deterministic ID generation using Blake3
         let mut hasher = blake3::Hasher::new();
         hasher.update(req.prompt.as_bytes());
         hasher.update(&req.seed.to_le_bytes());
         hasher.update(&req.steps.to_le_bytes());
         let id = hasher.finalize().to_string();
 
-        // Move compute to a blocking task
+        let device = self.device;
         let compute_id = id.clone();
+        
         tokio::task::spawn_blocking(move || {
-            tracing::info!("RusTorch: Starting compute for ID: {}", compute_id);
+            tracing::info!("RusTorch: Starting compute for ID: {} on {:?}", compute_id, device);
             
-            // Simulation of a RusTorch-based generation process.
             let shape = vec![512, 512, 3];
             let _latent = Tensor::from_vec(
                 vec![req.seed as f32; 512 * 512 * 3],
                 shape,
                 DType::F32,
-                Device::Cpu
+                device
             );
 
             let color_val = (req.prompt.chars().map(|c| c as u32).sum::<u32>() + req.seed) % 255;

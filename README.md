@@ -44,17 +44,32 @@ graph TD
     D --> F[ライブプレビュー]
 ```
 
-## 🛠️ クイックスタート
+## 🛠️ インストールと起動 (Installation)
 
-### 1. バックエンドの起動
+### 1. Docker で起動 (推奨: 環境構築 0 秒)
+最も簡単に Nebula を体験する方法です。
 ```bash
-cd nebula-canvas/backend
-cargo run --release
+docker-compose up --build
+```
+ブラウザで `http://localhost:3000` を開きます。
+
+### 2. デスクトップアプリとして起動 (Tauri)
+ブラウザを介さない独立したアプリケーションとして利用する場合。
+```bash
+cd frontend
+npm install
+npm run tauri dev # 開発モード
 ```
 
-### 2. フロントエンドの起動
+### 3. マニュアル起動 (開発者向け)
+#### バックエンドの起動
 ```bash
-cd nebula-canvas/frontend
+cd backend
+cargo run --release
+```
+#### フロントエンドの起動
+```bash
+cd frontend
 npm install
 npm run dev
 ```

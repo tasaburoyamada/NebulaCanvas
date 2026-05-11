@@ -13,12 +13,14 @@ Nebula は以下の構成からなるモノレポです。
 ### バックエンド (Backend)
 1. Rust (stable) がインストールされていることを確認してください。
 2. `cd backend`
-3. `cargo run` を実行します（データベース `nebula_canvas.redb` が自動的に作成されます）。
+3. `Settings.toml` を作成して設定を調整します（オプション）。
+4. `cargo run` を実行します（データベースは `Settings.toml` の指定に基づき自動作成されます）。
 
 ### フロントエンド (Frontend)
 1. `cd frontend`
-2. `npm install`
-3. `npm run dev`
+2. `.env.local` を作成し、`NEXT_PUBLIC_WS_URL` を設定します。
+3. `npm install`
+4. `npm run dev`
 
 ## 3. 主要なコンセプト
 

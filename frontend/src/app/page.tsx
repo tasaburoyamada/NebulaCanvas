@@ -27,7 +27,7 @@ export default function Home() {
   const [status, setStatus] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  const { lastMessage, sendMessage, isConnected } = useWebSocket('ws://127.0.0.1:3001/ws');
+  const { lastMessage, sendMessage, isConnected } = useWebSocket(process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:3001/ws');
 
   // Request history on connection
   useEffect(() => {
