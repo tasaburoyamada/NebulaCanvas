@@ -6,7 +6,7 @@ use axum::{
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::sync::{watch, mpsc};
-use crate::engine::{GenerationEngine, PromptRequest, ClientMessage, ServerMessage, ImageResponse};
+use crate::engine::{GenerationEngine, PromptRequest, ClientMessage, ServerMessage};
 use crate::state::AppState;
 
 pub async fn ws_handler(
@@ -29,6 +29,7 @@ async fn handle_socket(socket: WebSocket, engine: Arc<dyn GenerationEngine>, sta
     let tx_res_worker = tx_res.clone();
     
     let worker_handle = tokio::spawn(async move {
+
         while rx_goal.changed().await.is_ok() {
             let req_opt = rx_goal.borrow().clone();
             if let Some(req) = req_opt {
@@ -67,7 +68,6 @@ async fn handle_socket(socket: WebSocket, engine: Arc<dyn GenerationEngine>, sta
             msg = receiver.next() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
-                        // Parse as ClientMessage enum
                         match serde_json::from_str::<ClientMessage>(&text) {
                             Ok(ClientMessage::Generate(req)) => {
                                 let _ = tx_goal.send(Some(req));
@@ -82,13 +82,9 @@ async fn handle_socket(socket: WebSocket, engine: Arc<dyn GenerationEngine>, sta
                                     }
                                 }
                             }
-                            Err(_) => {
-                                // Backward compatibility / Fallback
-                                if let Ok(req) = serde_json::from_str::<PromptRequest>(&text) {
-                                     let _ = tx_goal.send(Some(req));
-                                } else {
-                                     let _ = tx_goal.send(Some(PromptRequest { prompt: text, seed: 42, steps: 20 }));
-                                }
+                            Err(e) => {
+                                tracing::warn!("Invalid message format: {}", e);
+                                let _ = tx_res.send(ServerMessage::Error("Invalid message format".to_string())).await;
                             }
                         }
                     }

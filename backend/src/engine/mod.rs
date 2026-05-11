@@ -35,5 +35,4 @@ pub trait GenerationEngine: Send + Sync {
     async fn generate(&self, req: PromptRequest) -> anyhow::Result<ImageResponse>;
 }
 
-pub mod mock;
 pub mod rustorch_impl;
