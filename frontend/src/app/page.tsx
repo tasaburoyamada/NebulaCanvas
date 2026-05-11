@@ -1,22 +1,117 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
+
+interface HistoryItem {
+  id: string;
+  image: string;
+  prompt: string;
+  seed: number;
+  steps: number;
+}
+
+type ServerMessage = 
+  | { type: 'ImageUpdate'; data: { id: string; data_url: string } }
+  | { type: 'HistoryDump'; data: any[] }
+  | { type: 'Status'; data: string }
+  | { type: 'Error'; data: string };
 
 export default function Home() {
   const [prompt, setPrompt] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [seed, setSeed] = useState(42);
+  const [steps, setSteps] = useState(20);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [currentImage, setCurrentImage] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
   const { lastMessage, sendMessage, isConnected } = useWebSocket('ws://127.0.0.1:3001/ws');
+
+  // Request history on connection
+  useEffect(() => {
+    if (isConnected) {
+      sendMessage(JSON.stringify({ type: 'GetHistory' }));
+    }
+  }, [isConnected, sendMessage]);
+
+  // Handle incoming server messages
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    try {
+      const msg: ServerMessage = JSON.parse(lastMessage);
+      switch (msg.type) {
+        case 'ImageUpdate':
+          setCurrentImage(msg.data.data_url);
+          setIsGenerating(false);
+          setStatus(null);
+          // Add to history if not duplicate
+          setHistory(prev => {
+            if (prev.some(item => item.id === msg.data.id)) return prev;
+            const newItem: HistoryItem = {
+              id: msg.data.id,
+              image: msg.data.data_url,
+              prompt,
+              seed,
+              steps,
+            };
+            return [newItem, ...prev].slice(0, 50);
+          });
+          break;
+        case 'HistoryDump':
+          const items: HistoryItem[] = msg.data.map((item: any) => ({
+            id: item.id,
+            image: item.image,
+            prompt: item.prompt,
+            seed: item.seed,
+            steps: item.steps,
+          }));
+          setHistory(items.reverse()); // Show newest first
+          if (items.length > 0 && !currentImage) {
+            setCurrentImage(items[0].image);
+          }
+          break;
+        case 'Status':
+          setStatus(msg.data);
+          if (msg.data === 'Generating...') setIsGenerating(true);
+          break;
+        case 'Error':
+          console.error('Backend Error:', msg.data);
+          setStatus(`Error: ${msg.data}`);
+          setIsGenerating(false);
+          break;
+      }
+    } catch (e) {
+      // Fallback for non-JSON messages (data urls from older implementation)
+      if (lastMessage.startsWith('data:image')) {
+        setCurrentImage(lastMessage);
+        setIsGenerating(false);
+      }
+    }
+  }, [lastMessage]);
 
   // Debounced prompt sending
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (prompt) {
-        sendMessage(prompt);
+      if (prompt && isConnected) {
+        sendMessage(JSON.stringify({
+          type: 'Generate',
+          data: { prompt, seed, steps }
+        }));
       }
-    }, 200); // 200ms debounce
+    }, 200);
 
     return () => clearTimeout(timer);
-  }, [prompt, sendMessage]);
+  }, [prompt, seed, steps, isConnected, sendMessage]);
+
+  const restoreFromHistory = (item: HistoryItem) => {
+    setPrompt(item.prompt);
+    setSeed(item.seed);
+    setSteps(item.steps);
+    setCurrentImage(item.image);
+  };
 
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black text-white">
@@ -24,29 +119,25 @@ export default function Home() {
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative h-full w-full max-w-4xl p-4 md:p-8 flex items-center justify-center">
           <div className="relative w-full aspect-square bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl flex items-center justify-center overflow-hidden">
-            {lastMessage && lastMessage.startsWith('data:image') ? (
+            {currentImage ? (
               <>
                 <img 
-                  src={lastMessage} 
+                  src={currentImage} 
                   alt="Generated" 
                   className={`w-full h-full object-cover transition-all duration-700 ${
                     isGenerating ? 'opacity-40 scale-105 blur-sm' : 'opacity-100 scale-100 blur-0'
                   }`}
                 />
                 {isGenerating && (
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
                     <div className="w-12 h-12 border-t-2 border-blue-500 rounded-full animate-spin shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
+                    <p className="text-xs font-medium tracking-widest uppercase text-blue-400 animate-pulse">{status}</p>
                   </div>
                 )}
               </>
-            ) : lastMessage ? (
-              <div className="text-center p-8">
-                <p className="text-zinc-400 text-sm mb-2">Message:</p>
-                <p className="text-xl font-medium text-zinc-100">{lastMessage}</p>
-              </div>
             ) : (
               <div className="text-zinc-600 animate-pulse">
-                Ready to generate...
+                {status || 'Ready to generate...'}
               </div>
             )}
             
@@ -61,13 +152,14 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Timeline Parallel (Phase 4) */}
-      <div className="absolute top-24 right-8 w-48 bottom-48 overflow-y-auto pr-4 scrollbar-hide flex flex-col gap-4">
+      {/* Timeline Parallel */}
+      <div className="absolute top-24 right-8 w-48 bottom-48 overflow-y-auto pr-4 scrollbar-hide flex flex-col gap-4 z-10">
+        <h3 className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-2">History</h3>
         {history.map((item) => (
           <button
             key={item.id}
             onClick={() => restoreFromHistory(item)}
-            className="relative aspect-square w-full rounded-xl border border-white/5 bg-zinc-900 overflow-hidden hover:border-blue-500/50 transition-all group"
+            className="relative aspect-square w-full rounded-xl border border-white/5 bg-zinc-900 overflow-hidden hover:border-blue-500/50 transition-all group shrink-0"
           >
             <img src={item.image} alt={item.prompt} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
@@ -77,8 +169,8 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Floating UI Layer (Phase 3 foundation) */}
-      <div className="absolute bottom-12 w-full max-w-2xl px-6 flex flex-col gap-4">
+      {/* Floating UI Layer */}
+      <div className="absolute bottom-12 w-full max-w-2xl px-6 flex flex-col gap-4 z-20">
         {/* Advanced Settings Panel */}
         <div 
           className={`bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden transition-all duration-500 ease-in-out ${
