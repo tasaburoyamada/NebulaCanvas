@@ -1,0 +1,1 @@
+Nebula Canvas project initialized
