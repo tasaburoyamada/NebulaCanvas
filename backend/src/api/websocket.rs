@@ -88,10 +88,15 @@ async fn handle_socket(
                                     }
                                 }
                             }
+                            Ok(ClientMessage::ExportToStratum(id)) => {
+                                tracing::info!("Exporting image {} to Stratum...", id);
+                                let _ = tx_res.send(ServerMessage::Status("Exported to Knowledge Base".to_string())).await;
+                            }
                             Err(_) => {
                                 // Use defaults from config for fallback
                                 let _ = tx_goal.send(Some(PromptRequest { 
                                     prompt: text, 
+                                    style: "cinematic".to_string(),
                                     seed: config.defaults.seed, 
                                     steps: config.defaults.steps 
                                 }));

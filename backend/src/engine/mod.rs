@@ -4,6 +4,7 @@ use async_trait::async_trait;
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PromptRequest {
     pub prompt: String,
+    pub style: String,
     pub seed: u32,
     pub steps: u32,
 }
@@ -19,6 +20,7 @@ pub struct ImageResponse {
 pub enum ClientMessage {
     Generate(PromptRequest),
     GetHistory,
+    ExportToStratum(String), // Image ID
 }
 
 #[derive(Debug, Serialize)]

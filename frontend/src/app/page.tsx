@@ -7,6 +7,7 @@ interface HistoryItem {
   id: string;
   image: string;
   prompt: string;
+  style?: string;
   seed: number;
   steps: number;
 }
@@ -19,6 +20,7 @@ type ServerMessage =
 
 export default function Home() {
   const [prompt, setPrompt] = useState('');
+  const [style, setStyle] = useState('Cinematic');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [seed, setSeed] = useState(42);
   const [steps, setSteps] = useState(20);
@@ -26,6 +28,8 @@ export default function Home() {
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const styles = ['Cinematic', 'Watercolor', 'Neon', 'Sketch', 'Default'];
   
   const { lastMessage, sendMessage, isConnected } = useWebSocket(process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:3001/ws');
 
@@ -54,6 +58,7 @@ export default function Home() {
               id: msg.data.id,
               image: msg.data.data_url,
               prompt,
+              style,
               seed,
               steps,
             };
@@ -98,16 +103,27 @@ export default function Home() {
       if (prompt && isConnected) {
         sendMessage(JSON.stringify({
           type: 'Generate',
-          data: { prompt, seed, steps }
+          data: { prompt, style, seed, steps }
         }));
       }
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [prompt, seed, steps, isConnected, sendMessage]);
+  }, [prompt, style, seed, steps, isConnected, sendMessage]);
+
+  const exportToStratum = () => {
+    const currentId = history.find(h => h.image === currentImage)?.id;
+    if (currentId && isConnected) {
+      sendMessage(JSON.stringify({
+        type: 'ExportToStratum',
+        data: currentId
+      }));
+    }
+  };
 
   const restoreFromHistory = (item: HistoryItem) => {
     setPrompt(item.prompt);
+    setStyle(item.style || 'Cinematic');
     setSeed(item.seed);
     setSteps(item.steps);
     setCurrentImage(item.image);
@@ -142,11 +158,21 @@ export default function Home() {
             )}
             
             {/* Status indicator */}
-            <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 border border-white/10 backdrop-blur-sm">
-              <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`} />
-              <span className="text-[10px] font-medium tracking-wider uppercase text-zinc-400">
-                {isConnected ? 'Live' : 'Disconnected'}
-              </span>
+            <div className="absolute top-4 right-4 flex items-center gap-4">
+              {currentImage && (
+                <button 
+                  onClick={exportToStratum}
+                  className="px-3 py-1 rounded-full bg-blue-600/20 border border-blue-500/30 text-[9px] uppercase tracking-widest font-bold text-blue-400 hover:bg-blue-600/40 transition-all backdrop-blur-sm"
+                >
+                  Save to Knowledge Base
+                </button>
+              )}
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 border border-white/10 backdrop-blur-sm">
+                <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`} />
+                <span className="text-[10px] font-medium tracking-wider uppercase text-zinc-400">
+                  {isConnected ? 'Live' : 'Disconnected'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -221,9 +247,17 @@ export default function Home() {
             {/* Minimal controls hint */}
             <div className="flex items-center justify-between px-6 py-2 border-t border-white/5 bg-black/20">
               <div className="flex gap-4">
-                <button className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors uppercase tracking-widest font-bold">
-                  Style: Cinematic
-                </button>
+                {styles.map(s => (
+                  <button 
+                    key={s}
+                    onClick={() => setStyle(s)}
+                    className={`text-[10px] transition-colors uppercase tracking-widest font-bold ${
+                      style === s ? 'text-blue-400' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
               <button 
                 onClick={() => setShowAdvanced(!showAdvanced)}
