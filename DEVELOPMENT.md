@@ -1,35 +1,35 @@
-# Nebula Canvas: Development Guide
+# Nebula Canvas: 開発ガイド
 
-This guide details the setup and contribution workflow for Nebula Canvas.
+このガイドでは、Nebula Canvas のセットアップと開発ワークフローの詳細について説明します。
 
-## 1. Project Architecture
+## 1. プロジェクト構成
 
-Nebula is a monorepo consisting of:
-- `frontend/`: Next.js / React / Tailwind UI.
-- `backend/`: Rust / Axum / RusTorch engine.
+Nebula は以下の構成からなるモノレポです。
+- `frontend/`: Next.js / React / Tailwind UI
+- `backend/`: Rust / Axum / RusTorch エンジン
 
-## 2. Local Setup
+## 2. ローカルセットアップ
 
-### Backend
-1. Ensure Rust (stable) is installed.
+### バックエンド (Backend)
+1. Rust (stable) がインストールされていることを確認してください。
 2. `cd backend`
-3. `cargo run` (The database `nebula_canvas.redb` will be created automatically).
+3. `cargo run` を実行します（データベース `nebula_canvas.redb` が自動的に作成されます）。
 
-### Frontend
+### フロントエンド (Frontend)
 1. `cd frontend`
 2. `npm install`
 3. `npm run dev`
 
-## 3. Key Concepts
+## 3. 主要なコンセプト
 
-### Goal-State Dispatcher
-The backend implements a `watch::channel` based dispatcher. When a user types, the WebSocket receiver updates the "Goal State" immediately. A background worker task monitors this state and triggers the `RusTorchEngine` only when it's ready for a new task, ensuring the most recent prompt is always prioritized without blocking the network.
+### ゴール状態ディスパッチャ (Goal-State Dispatcher)
+バックエンドは `watch::channel` ベースのディスパッチャを実装しています。ユーザーが入力を行うと、WebSocket 受信ループは即座に「最新の目標状態（Goal State）」を更新します。バックグラウンドのワーカータスクはこの状態を監視し、エンジンが準備でき次第、常に「最新のプロンプト」を優先して処理します。これにより、ネットワークをブロックすることなく、意図した通りの画像を生成できます。
 
-### Pyramid UI Layers
-- **L0**: High-level components in `src/app/page.tsx`.
-- **L1**: Shared state management via React hooks.
-- **L2**: Low-level WebSocket abstraction in `src/hooks/useWebSocket.ts`.
+### ピラミッド UI (Pyramid UI)
+- **L0 (表層)**: `src/app/page.tsx` に配置された高レベルコンポーネント。
+- **L1 (拡張)**: React hook を通じた共有状態管理。
+- **L2 (深層)**: `src/hooks/useWebSocket.ts` による低レベルな WebSocket 抽象化。
 
-## 4. Coding Standards
-- **Rust**: Follow `clippy` and use `anyhow` for error handling. Use `spawn_blocking` for compute.
-- **Frontend**: Functional components with Tailwind CSS. Avoid heavy external state libraries unless necessary (currently using local state/props).
+## 4. コーディング規約
+- **Rust**: `clippy` の推奨に従い、エラーハンドリングには `anyhow` を使用してください。計算コストの高い処理は `spawn_blocking` で実行します。
+- **Frontend**: Tailwind CSS を使用した関数型コンポーネントを推奨します。現在はローカルステートで管理されていますが、必要に応じて Zustand 等の導入を検討してください。

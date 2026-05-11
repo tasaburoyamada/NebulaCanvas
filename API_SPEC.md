@@ -1,22 +1,22 @@
-# Nebula Canvas: API Specification
+# Nebula Canvas: API 仕様書
 
-Nebula Canvas utilizes a structured WebSocket protocol for real-time communication between the Frontend and Backend.
+Nebula Canvas は、フロントエンドとバックエンド間のリアルタイム通信に構造化された WebSocket プロトコルを使用します。
 
-## 1. Connection Details
-- **Default URL**: `ws://127.0.0.1:3001/ws`
-- **Format**: JSON (UTF-8)
+## 1. 接続詳細
+- **デフォルト URL**: `ws://127.0.0.1:3001/ws`
+- **形式**: JSON (UTF-8)
 
-## 2. Client Messages (Frontend -> Backend)
+## 2. クライアント・メッセージ (Frontend -> Backend)
 
-Messages must include a `type` and optional `data` field.
+全てのメッセージは `type` フィールドを含み、必要に応じて `data` フィールドを持ちます。
 
 ### `Generate`
-Triggers a new image generation.
+新しい画像の生成を開始します。
 ```json
 {
   "type": "Generate",
   "data": {
-    "prompt": "A magical forest",
+    "prompt": "魔法の森",
     "seed": 42,
     "steps": 20
   }
@@ -24,17 +24,17 @@ Triggers a new image generation.
 ```
 
 ### `GetHistory`
-Requests a full dump of the generation history.
+生成履歴の全ダンプを要求します。
 ```json
 {
   "type": "GetHistory"
 }
 ```
 
-## 3. Server Messages (Backend -> Frontend)
+## 3. サーバー・メッセージ (Backend -> Frontend)
 
 ### `ImageUpdate`
-Sent when a generation completes.
+生成が完了した際に送信されます。
 ```json
 {
   "type": "ImageUpdate",
@@ -46,7 +46,7 @@ Sent when a generation completes.
 ```
 
 ### `HistoryDump`
-Returns an array of all past generations.
+過去の全ての生成結果を配列で返します。
 ```json
 {
   "type": "HistoryDump",
@@ -63,7 +63,7 @@ Returns an array of all past generations.
 ```
 
 ### `Status`
-Real-time status updates from the engine.
+エンジンのリアルタイムな状態を通知します。
 ```json
 {
   "type": "Status",
@@ -72,10 +72,10 @@ Real-time status updates from the engine.
 ```
 
 ### `Error`
-Sent when an operation fails.
+操作が失敗した際に送信されます。
 ```json
 {
   "type": "Error",
-  "data": "ErrorMessage"
+  "data": "エラーメッセージの内容"
 }
 ```
