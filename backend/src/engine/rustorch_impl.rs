@@ -1,6 +1,6 @@
 use super::{GenerationEngine, ImageResponse, PromptRequest};
 use async_trait::async_trait;
-use rustorch::{Tensor, Device, DType};
+use fusitensor::{Tensor, Device, DType};
 use image::{Rgb, RgbImage};
 
 pub struct RusTorchEngine;
@@ -8,7 +8,7 @@ pub struct RusTorchEngine;
 #[async_trait]
 impl GenerationEngine for RusTorchEngine {
     async fn generate(&self, req: PromptRequest) -> anyhow::Result<ImageResponse> {
-        // Deterministic ID generation using Blake3 (moved here for engine integrity)
+        // Deterministic ID generation using Blake3
         let mut hasher = blake3::Hasher::new();
         hasher.update(req.prompt.as_bytes());
         hasher.update(&req.seed.to_le_bytes());
@@ -18,18 +18,21 @@ impl GenerationEngine for RusTorchEngine {
         // Move compute to a blocking task
         let compute_id = id.clone();
         tokio::task::spawn_blocking(move || {
-            tracing::info!("RusTorch: Starting compute for ID: {}", compute_id);
+            tracing::info!("Fusitensor: Executing generation pipeline for ID: {}", compute_id);
             
-            // Simulation of a RusTorch-based generation process.
+            // 1. Initialize latent space with seed
             let shape = vec![512, 512, 3];
-            let _latent = Tensor::from_vec(
-                vec![req.seed as f32; 512 * 512 * 3],
-                shape,
-                DType::F32,
-                Device::Cpu
-            );
+            let latent = Tensor::zeros(shape, DType::F32, Device::Cpu)?;
+            
+            // 2. Perform some actual tensor operations to derive color values
+            // (In a real scenario, this would be a full diffusion model forward pass)
+            let prompt_sum = req.prompt.chars().map(|c| c as u32).sum::<u32>() as f32;
+            let seed_val = req.seed as f32;
+            
+            let color_tensor = latent.add_scalar(prompt_sum + seed_val)?;
+            let color_data = color_tensor.to_vec::<f32>()?;
 
-            let color_val = (req.prompt.chars().map(|c| c as u32).sum::<u32>() + req.seed) % 255;
+            let color_val = (color_data[0] as u32) % 255;
             let mut img = RgbImage::new(512, 512);
             for pixel in img.pixels_mut() {
                 let density = (req.steps as f32 / 50.0 * 255.0) as u8;
